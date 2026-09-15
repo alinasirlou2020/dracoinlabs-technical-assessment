@@ -2,6 +2,7 @@
   "name": "RentVerse",
   "version": "0.1.77",
   "private": true,
+  "proxy": "http://localhost:3099",
   "dependencies": {
     "@react-three/drei": "^9.75.0",
     "@react-three/fiber": "^8.13.3",

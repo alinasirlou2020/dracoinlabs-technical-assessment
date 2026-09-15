@@ -1,11 +1,20 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 import { FiHome, FiMaximize2, FiCalendar, FiTrendingUp, FiUsers, FiDollarSign, FiGrid } from 'react-icons/fi';
 import { FacebookShareButton, TwitterShareButton, LinkedinShareButton } from 'react-share';
 import { FaFacebook, FaTwitter, FaLinkedin, FaEthereum, FaWallet } from 'react-icons/fa';
 
 function PropertyDetail() {
   const { id } = useParams();
+
+  // Simulated investor address (in a real wallet flow this would come from WalletConnect/MetaMask)
+  const investorAddress = 'demo-investor-wallet';
+  const [tokenAmount, setTokenAmount] = useState(10);
+  const [balance, setBalance] = useState(0);
+  const [txStatus, setTxStatus] = useState(null); // { type: 'success' | 'error', message }
+  const [isInvesting, setIsInvesting] = useState(false);
 
   const property = {
     id: parseInt(id),
@@ -74,6 +83,50 @@ function PropertyDetail() {
   };
 
   const shareUrl = window.location.href;
+  const contractAddress = property.tokenDetails.contractAddress;
+
+  // Deploy (idempotent) the property's token contract and load the
+  // current investor balance from the ledger API on mount.
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await axios.post('/api/ledger/deploy', {
+          contractAddress,
+          symbol: property.tokenDetails.tokenSymbol,
+          name: property.title,
+        });
+        const res = await axios.get(
+          `/api/ledger/${contractAddress}/balance/${investorAddress}`
+        );
+        setBalance(res.data.balance);
+      } catch (err) {
+        // Non-fatal: page still renders using the static mock data above
+        console.error('Ledger init failed', err);
+      }
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractAddress]);
+
+  const handleInvest = async () => {
+    if (!tokenAmount || tokenAmount <= 0) return;
+    setIsInvesting(true);
+    setTxStatus(null);
+    try {
+      // Mint the purchased tokens straight to the investor's address,
+      // simulating the property owner/contract issuing new fractional shares.
+      const res = await axios.post(`/api/ledger/${contractAddress}/mint`, {
+        to: investorAddress,
+        amount: tokenAmount,
+      });
+      setBalance(res.data.balance);
+      setTxStatus({ type: 'success', message: `Purchased ${tokenAmount} ${property.tokenDetails.tokenSymbol} tokens.` });
+    } catch (err) {
+      setTxStatus({ type: 'error', message: err.response?.data?.message || 'Transaction failed' });
+    } finally {
+      setIsInvesting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-secondary-50">
@@ -184,6 +237,35 @@ function PropertyDetail() {
                     <p className="text-sm text-secondary-600">Smart Contract</p>
                     <p className="font-mono text-sm">{property.tokenDetails.contractAddress}</p>
                   </div>
+                </div>
+
+                {/* Invest / Ledger interaction */}
+                <div className="mt-6 pt-6 border-t border-secondary-200">
+                  <p className="text-sm text-secondary-600 mb-2">
+                    Your balance: <span className="font-semibold">{balance} {property.tokenDetails.tokenSymbol}</span>
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="1"
+                      value={tokenAmount}
+                      onChange={(e) => setTokenAmount(parseInt(e.target.value, 10) || 0)}
+                      className="w-28 border border-secondary-300 rounded-md px-3 py-2"
+                    />
+                    <button
+                      onClick={handleInvest}
+                      disabled={isInvesting}
+                      className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <FaWallet />
+                      {isInvesting ? 'Processing...' : `Invest ${tokenAmount} tokens`}
+                    </button>
+                  </div>
+                  {txStatus && (
+                    <p className={`mt-2 text-sm ${txStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                      {txStatus.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
