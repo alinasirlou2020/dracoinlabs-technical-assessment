@@ -6,6 +6,9 @@ import { FiHome, FiMaximize2, FiCalendar, FiTrendingUp, FiUsers, FiDollarSign, F
 import { FacebookShareButton, TwitterShareButton, LinkedinShareButton } from 'react-share';
 import { FaFacebook, FaTwitter, FaLinkedin, FaEthereum, FaWallet } from 'react-icons/fa';
 
+// Talk to the backend directly (bypasses any CRA dev-server proxy quirks)
+const API_BASE = 'http://localhost:3099';
+
 function PropertyDetail() {
   const { id } = useParams();
 
@@ -90,13 +93,13 @@ function PropertyDetail() {
   useEffect(() => {
     const init = async () => {
       try {
-        await axios.post('/api/ledger/deploy', {
+        await axios.post(`${API_BASE}/api/ledger/deploy`, {
           contractAddress,
           symbol: property.tokenDetails.tokenSymbol,
           name: property.title,
         });
         const res = await axios.get(
-          `/api/ledger/${contractAddress}/balance/${investorAddress}`
+          `${API_BASE}/api/ledger/${contractAddress}/balance/${investorAddress}`
         );
         setBalance(res.data.balance);
       } catch (err) {
@@ -115,7 +118,7 @@ function PropertyDetail() {
     try {
       // Mint the purchased tokens straight to the investor's address,
       // simulating the property owner/contract issuing new fractional shares.
-      const res = await axios.post(`/api/ledger/${contractAddress}/mint`, {
+      const res = await axios.post(`${API_BASE}/api/ledger/${contractAddress}/mint`, {
         to: investorAddress,
         amount: tokenAmount,
       });
